@@ -1,4 +1,4 @@
-*.txt
+gamelog.txt
 *.exe
 state
 build
