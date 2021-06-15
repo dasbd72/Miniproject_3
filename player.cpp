@@ -19,7 +19,18 @@ struct Point {
     }
 };
 
-class Board : public std::array<std::array<int, SIZE>, SIZE> {
+class Board {
+   public:
+    Board& operator=(Board& objBoard) {
+        this->board = objBoard.board;
+        this->discCnt = objBoard.discCnt;
+        this->curPlayer = objBoard.curPlayer;
+        return (*this);
+    }
+    constexpr const std::array<int, SIZE> operator[](int idx) const {
+        return this->board[idx];
+    }
+
    public:
     enum SPOT_STATE {
         EMPTY = 0,
@@ -31,12 +42,12 @@ class Board : public std::array<std::array<int, SIZE>, SIZE> {
                                            Point(1, -1), Point(1, 0), Point(1, 1)}};
     std::array<int, 3> discCnt;
     int curPlayer;
+    std::array<std::array<int, SIZE>, SIZE> board;
 
    public:
     Board() {
-        std::array<std::array<int, SIZE>, SIZE>();
         std::fill(this->discCnt.begin(), this->discCnt.end(), 0);
-    };
+    }
     ~Board() = default;
     int get_next_player(int player) const {
         return 3 - player;
@@ -45,10 +56,10 @@ class Board : public std::array<std::array<int, SIZE>, SIZE> {
         return 0 <= p.x && p.x < SIZE && 0 <= p.y && p.y < SIZE;
     }
     int get_disc(Point p) const {
-        return (*this)[p.x][p.y];
+        return board[p.x][p.y];
     }
     void set_disc(Point p, int disc) {
-        (*this)[p.x][p.y] = disc;
+        board[p.x][p.y] = disc;
     }
     bool is_disc_at(Point p, int disc) const {
         if (!is_spot_on_board(p))
@@ -76,7 +87,6 @@ class Board : public std::array<std::array<int, SIZE>, SIZE> {
     }
     void flip_discs(Point center) {
         for (Point dir : directions) {
-            // Move along the direction while testing.
             Point p = center + dir;
             if (!is_disc_at(p, get_next_player(curPlayer)))
                 continue;
@@ -97,17 +107,53 @@ class Board : public std::array<std::array<int, SIZE>, SIZE> {
         }
     }
 };
+class AIMethod {
+   protected:
+    int curPlayer;
+    Board curBoard;
+    std::vector<Point> nxtSpots;
+
+   public:
+    AIMethod() {}
+    virtual ~AIMethod() {}
+    virtual void __init__(int& player, Board& board, std::vector<Point>& next_spots) {
+        this->curPlayer = player;
+        this->curBoard = board;
+        this->nxtSpots = next_spots;
+    }
+    virtual Point solve() { return Point(0, 0); }
+};
+
+class AIRandom : public AIMethod {
+   public:
+    Point solve() {
+        int n_valid_spots = nxtSpots.size();
+        srand(time(NULL));
+        int index = (rand() % n_valid_spots);
+        return nxtSpots[index];
+    }
+};
+
+class AIStateValueFunction : public AIMethod {
+    const std::array<std::array<int, SIZE>, SIZE> STATEVAL = {{
+        {10, 1, 5, 5, 5, 5, 1, 10},
+        {1, 1, 2, 2, 2, 2, 1, 1},
+        {5, 2, 3, 3, 3, 3, 2, 5},
+        {5, 2, 3, 3, 3, 3, 2, 5},
+        {5, 2, 3, 3, 3, 3, 2, 5},
+        {5, 2, 3, 3, 3, 3, 2, 5},
+        {1, 1, 2, 2, 2, 2, 1, 1},
+        {10, 1, 5, 5, 5, 5, 1, 10},
+    }};
+
+   public:
+    void solve() override{
+        queue<Board> tasks;
+        
+    }
+};
 
 class Player {
-   public:
-    enum AI_TYPE {
-        RANDOM = 0,
-        MANUAL = 1,
-        STATE_VALUE_FUNCTION = 2,
-        MINIMAX = 3,
-        ALPHA_BETA_PRUNING = 4
-    };
-
    private:
     int curPlayer;
     Board curBoard;
@@ -119,34 +165,19 @@ class Player {
    public:
     Player(int argc, char** argv) : argc(argc), argv(argv) {}
 
-    void start(AI_TYPE option = RANDOM) {
-        std::ifstream fin(this->argv[1]);
-        std::ofstream fout(this->argv[2]);
-        this->read_board(fin);
-        this->read_valid_spots(fin);
-        std::cout << "I'm player: " << curPlayer << std::endl;
-        switch (option) {
-            case RANDOM:
-                this->move_random();
-                break;
-            case MANUAL:
-                this->move_manual();
-                break;
-            case STATE_VALUE_FUNCTION:
-                this->move_state_value_function();
-                break;
-            case MINIMAX:
-                this->move_minimax();
-                break;
-            case ALPHA_BETA_PRUNING:
-                this->move_alpha_beta_pruning();
-                break;
-            default:
-                this->move_random();
-                break;
+    void start(AIMethod* aiMethod) {
+        std::ifstream fin(this->argv[1]);   // Input file stream
+        std::ofstream fout(this->argv[2]);  // Output file stream
+        this->read_board(fin);              // Read the board from fin
+        this->read_valid_spots(fin);        // Read Valid inputs from fin
+
+        if (aiMethod) {
+            aiMethod->__init__(curPlayer, curBoard, nxtSpots);
+            this->finSpot = aiMethod->solve();
+            delete aiMethod;
         }
 
-        this->write_valid_spot(fout);
+        this->write_valid_spot(fout);  // Output My Move
         fin.close();
         fout.close();
     }
@@ -155,7 +186,7 @@ class Player {
         fin >> curPlayer;
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
-                fin >> this->curBoard[i][j];
+                fin >> this->curBoard.board[i][j];
             }
         }
     }
@@ -170,24 +201,6 @@ class Player {
         }
     }
 
-    void move_random() {
-        int n_valid_spots = nxtSpots.size();
-        srand(time(NULL));
-        int index = (rand() % n_valid_spots);
-        finSpot = nxtSpots[index];
-    }
-    void move_manual() {
-        int index;
-        std::cin >> index;
-        finSpot = nxtSpots[index];
-    }
-    void move_state_value_function() {
-    }
-    void move_minimax() {
-    }
-    void move_alpha_beta_pruning() {
-    }
-
     void write_valid_spot(std::ofstream& fout) {
         // Remember to flush the output to ensure the last action is written to file.
         fout << finSpot.x << " " << finSpot.y << std::endl;
@@ -197,6 +210,6 @@ class Player {
 
 int main(int argc, char** argv) {
     Player player(argc, argv);
-    player.start(Player::RANDOM);
+    player.start(new AIRandom());
     return 0;
 }
