@@ -1,9 +1,9 @@
-#include <iostream>
-#include <fstream>
 #include <array>
-#include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
+#include <iostream>
+#include <vector>
 
 struct Point {
     int x, y;
@@ -13,6 +13,21 @@ int player;
 const int SIZE = 8;
 std::array<std::array<int, SIZE>, SIZE> board;
 std::vector<Point> next_valid_spots;
+
+void read_board(std::ifstream& fin);
+void read_valid_spots(std::ifstream& fin);
+void write_valid_spot(std::ofstream& fout);
+
+int main(int, char** argv) {
+    std::ifstream fin(argv[1]);
+    std::ofstream fout(argv[2]);
+    read_board(fin);
+    read_valid_spots(fin);
+    write_valid_spot(fout);
+    fin.close();
+    fout.close();
+    return 0;
+}
 
 void read_board(std::ifstream& fin) {
     fin >> player;
@@ -37,20 +52,11 @@ void write_valid_spot(std::ofstream& fout) {
     int n_valid_spots = next_valid_spots.size();
     srand(time(NULL));
     // Choose random spot. (Not random uniform here)
+
     int index = (rand() % n_valid_spots);
     Point p = next_valid_spots[index];
+
     // Remember to flush the output to ensure the last action is written to file.
     fout << p.x << " " << p.y << std::endl;
     fout.flush();
-}
-
-int main(int, char** argv) {
-    std::ifstream fin(argv[1]);
-    std::ofstream fout(argv[2]);
-    read_board(fin);
-    read_valid_spots(fin);
-    write_valid_spot(fout);
-    fin.close();
-    fout.close();
-    return 0;
 }
