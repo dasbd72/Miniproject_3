@@ -9,3 +9,4 @@ set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra")
 
 add_executable(Player player.cpp)
 add_executable(Main src/main.cpp)
+add_executable(Main1 src/main1.cpp)

@@ -286,7 +286,7 @@ class AIMethod {
 class AIRandom : public AIMethod {
    public:
     AIRandom() {
-        // LOG() << "Method: Random\n";
+        LOG() << "Method: Random\n";
     }
     Point solve() {
         int n_valid_spots = nxtSpots.size();
@@ -302,7 +302,7 @@ class AIRandom : public AIMethod {
 class AIStateValueFunction : public AIMethod {
    public:
     AIStateValueFunction() {
-        // LOG() << "Method: State Value Function\n";
+        LOG() << "Method: State Value Function\n";
     }
     Point solve() override {
         Point finSpot;
@@ -316,7 +316,7 @@ class AIStateValueFunction : public AIMethod {
                 maxValue = nxtBoard.get_value();
                 finSpot = spot;
             }
-            // LOG() << "Value of (" << spot.x << ", " << spot.y << "): " << nxtBoard.get_value() << "\n";
+            LOG() << "Value of (" << spot.x << ", " << spot.y << "): " << nxtBoard.get_value() << "\n";
         }
         return finSpot;
     }
@@ -324,7 +324,7 @@ class AIStateValueFunction : public AIMethod {
 class AIMinimax : public AIMethod {
    public:
     AIMinimax() {
-        // LOG() << "Method: Minimax\n";
+        LOG() << "Method: Minimax\n";
     }
     Point solve() override {
         Point finSpot;
@@ -342,7 +342,7 @@ class AIMinimax : public AIMethod {
                 finSpot = spot;
                 maxVal = nxtVal;
             }
-            // LOG() << "Value of (" << spot.x << ", " << spot.y << "): " << nxtVal << "\n";
+            LOG() << "Value of (" << spot.x << ", " << spot.y << "): " << nxtVal << "\n";
         }
 
         return finSpot;
@@ -386,11 +386,9 @@ class Player {
     Point finSpot;
 
    public:
-    Player(int argc, char** argv) {
-        if (argc >= 3) {
-            fin.open(argv[1]);   // Input file stream
-            fout.open(argv[2]);  // Output file stream
-        }
+    Player(char** argv) {
+        fin.open(argv[1]);   // Input file stream
+        fout.open(argv[2]);  // Output file stream
     }
     ~Player() {
         fin.close();
@@ -403,13 +401,13 @@ class Player {
         this->write_valid_spot(fout);  // Output once first to prevent running too long
         this->curBoard.set_player(curPlayer);
 
-        // LOG() << "Current Player: " << this->curPlayer << "\n";
-        // LOG() << "Current Board:\n";
-        // LOG() << this->curBoard;
-        // LOG() << "Valid moves:\n";
+        LOG() << "Current Player: " << this->curPlayer << "\n";
+        LOG() << "Current Board:\n";
+        LOG() << this->curBoard;
+        LOG() << "Valid moves:\n";
         for (auto it = this->nxtSpots.begin(); it != this->nxtSpots.end(); it++) {
             auto nxtit = it;
-            // LOG() << (*it) << (++nxtit != this->nxtSpots.end() ? ", " : "\n");
+            LOG() << (*it) << (++nxtit != this->nxtSpots.end() ? ", " : "\n");
         }
 
         if (aiMethod) {
@@ -441,19 +439,20 @@ class Player {
     }
 
     void write_valid_spot(std::ofstream& fout) {
-        // LOG() << "Expected Move: " << this->finSpot << "\n";
+        LOG() << "Expected Move: " << this->finSpot << "\n";
         if (this->nxtSpots.find(this->finSpot) == this->nxtSpots.end()) this->finSpot = *(this->nxtSpots.begin());
-        // LOG() << "Final Move: " << this->finSpot << "\n";
+        LOG() << "Final Move: " << this->finSpot << "\n";
 
         fout << this->finSpot.x << " " << this->finSpot.y << std::endl;
         fout.flush();
     }
 };
 
-int main(int argc, char** argv) {
+int main(int, char** argv) {
     if (DEBUG) LOG::initialize();
-    Player player(argc, argv);
+    Player player(argv);
     player.start(new AIMinimax());
+    player.~Player();
     if (DEBUG) LOG::terminate();
     return 0;
 }
