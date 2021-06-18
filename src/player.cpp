@@ -230,9 +230,9 @@ std::ostream& operator<<(std::ostream& os, const Point& rhs) {
     return os;
 }
 std::ostream& operator<<(std::ostream& os, const Board& rhs) {
-    os << "┌─────────────────┐\n";
+    os << "+---------------+\n";
     for (int i = 0; i < SIZE; i++) {
-        os << "│ ";
+        os << "|";
         for (int j = 0; j < SIZE; j++) {
             switch (rhs[i][j]) {
                 case 1:
@@ -247,9 +247,9 @@ std::ostream& operator<<(std::ostream& os, const Board& rhs) {
             }
             os << " ";
         }
-        os << "│\n";
+        os << "|\n";
     }
-    os << "└─────────────────┘\n";
+    os << "+---------------+\n";
     return os;
 }
 
@@ -449,7 +449,7 @@ class AIAlphaBetaPruning : public AIMethod {
    private:
     const int MAXDEPTH = 6;
     int getAlphaBetaVal(Board curBoard, int depth, int alpha, int beta) const {
-        if (depth > MAXDEPTH) return 0;
+        if (depth > MAXDEPTH + (curBoard.get_player() == 2 ? 1 : 0)) return 0;
 
         std::set<Point> nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots());
         int maxVal = INT_MIN;
@@ -491,9 +491,10 @@ int main(int, char** argv) {
     if (DEBUG) {
         LOCALTIME::start = std::chrono::system_clock::now();
         LOG::fout.open("debuglog.txt", std::ofstream::ate | std::ofstream::app);
-        LOG() << "┌──────────────────────────────┐\n";
+        LOG() << "╰(*°▽°*)╯(❁´◡`❁)(●'◡'●)\n";
     }
 
+    AIMethod* aiMethod = new AIAlphaBetaPruning();
     Engine::fin.open(argv[1]);                      // Input file stream
     Engine::fout.open(argv[2]);                     // Output file stream
     Engine::read_board();                           // Read the board from fin
@@ -514,14 +515,13 @@ int main(int, char** argv) {
     }
 
     // Start AI;
-    AIMethod* aiMethod = new AIAlphaBetaPruning();
     aiMethod->initialize(Engine::curPlayer, Engine::curBoard, Engine::nxtSpots);
     aiMethod->solve();
     delete aiMethod;
 
     if (DEBUG) {
         LOG() << "Duration: " << LOCALTIME::get_duration().count() << "s\n";
-        LOG() << "└──────────────────────────────┘\n";
+        LOG() << "=================\n";
         LOG::fout.close();
     }
 
