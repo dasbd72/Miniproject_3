@@ -1,5 +1,5 @@
-[System.Threading.Thread]::CurrentThread.CurrentUICulture = "en-US" ; [System.Threading.Thread]::CurrentThread.CurrentCulture = "en-US"; $start_time = Get-Date -UFormat "%Y-%m-%d--%H-%M-%S"
-$main = 'Main1.exe'
+[System.Threading.Thread]::CurrentThread.CurrentUICulture = "en-US" ; [System.Threading.Thread]::CurrentThread.CurrentCulture = "en-US"; $start_time = Get-Date -UFormat "%Y-%m-%d--%H-%M"
+$main = 'Main.exe'
 $baselines = @(
     '',
     'baseline\windows\baseline1.exe',
@@ -8,8 +8,10 @@ $baselines = @(
     'baseline\windows\baseline4.exe',
     'baseline\windows\baseline5.exe'
 )
-$player = @('Player.exe', $baselines[5])
-$start_time += "--PvsB5" #name of test
+$baselineidx = 5
+$player = @('Player.exe', $baselines[$baselineidx])
+#name of test
+$start_time += "--Pmm2d5vsB" + $baselineidx
 
 for ($i = 1; $i -le 6; $i++) {
     $room_base = Join-Path 'room' $start_time
@@ -20,5 +22,5 @@ for ($i = 1; $i -le 6; $i++) {
     Copy-Item $player[0] $room_dir
     Copy-Item $player[1] $room_dir
 
-    Start-Process -WindowStyle Hidden -WorkingDirectory $room_dir -FilePath (Join-Path $room_dir $main) -ArgumentList (Get-ChildItem -Path $player[($i + 1) % 2] -Name), (Get-ChildItem -Path $player[$i % 2] -Name) -RedirectStandardOutput (Join-Path $room_base ("Log" + $i + ".txt"))
+    Start-Process -WindowStyle Minimized -WorkingDirectory $room_dir -FilePath (Join-Path $room_dir $main) -ArgumentList (Get-ChildItem -Path $player[($i + 1) % 2] -Name), (Get-ChildItem -Path $player[$i % 2] -Name) -RedirectStandardOutput (Join-Path $room_base ("Log" + $i + ".txt"))
 }

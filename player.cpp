@@ -1,5 +1,7 @@
 #include <bits/stdc++.h>
 #define DEBUG 1
+#define MIN -0x7FFFFFFF
+#define MAX 0x7FFFFFFF
 const int SIZE = 8;
 using State = std::array<std::array<int, SIZE>, SIZE>;
 struct LOCALTIME {
@@ -71,6 +73,7 @@ struct Point {
 class Board {
    public:
     // Operators
+    friend class Engine;
     friend std::ostream& operator<<(std::ostream&, const Board&);
     bool operator==(const Board& rhs) const {
         return this->curPlayer == rhs.curPlayer && this->board == rhs.board;
@@ -87,45 +90,49 @@ class Board {
     Board& operator=(Board& rhs) {
         this->board = rhs.board;
         this->curPlayer = rhs.curPlayer;
+        this->discsCnt = rhs.discsCnt;
         return *this;
     }
-    const constexpr std::array<int, SIZE> operator[](int idx) const {
+    constexpr std::array<int, SIZE> operator[](int idx) const {
         return this->board[idx];
     }
-
-   public:
+    const std::array<Point, 8> directions{{Point(-1, -1), Point(-1, 0), Point(-1, 1),
+                                           Point(0, -1), /*{0, 0}, */ Point(0, 1),
+                                           Point(1, -1), Point(1, 0), Point(1, 1)}};
     enum SPOT_STATE {
         EMPTY = 0,
         BLACK = 1,
         WHITE = 2
     };
-    const std::array<Point, 8> directions{{Point(-1, -1), Point(-1, 0), Point(-1, 1),
-                                           Point(0, -1), /*{0, 0}, */ Point(0, 1),
-                                           Point(1, -1), Point(1, 0), Point(1, 1)}};
-    State board;
 
    private:
+    State board;
     int curPlayer;
     int value;
-    int cntDisks;
+    std::array<int, 3> discsCnt;
 
    public:
     Board() {
-        value = std::numeric_limits<int>::min();
-        cntDisks = 0;
+        value = 0;
+        discsCnt = {0, 0, 0};
     }
     Board(const Board& other) {
         Board();
         this->board = other.board;
         this->curPlayer = other.curPlayer;
-        this->cntDisks = other.cntDisks;
+        this->discsCnt = other.discsCnt;
     }
-
     ~Board() = default;
-
-    void set_player(int player) {
+    void initialize(int player) {
         this->curPlayer = player;
+
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                discsCnt[board[i][j]]++;
+            }
+        }
     }
+
     void flip_player() {
         this->curPlayer = this->get_next_player();
     }
@@ -135,23 +142,20 @@ class Board {
     int get_next_player() const {
         return 3 - this->curPlayer;
     }
-
     bool is_spot_on_board(Point p) const {
         return 0 <= p.x && p.x < SIZE && 0 <= p.y && p.y < SIZE;
     }
-
     int get_disc(Point p) const {
         return board[p.x][p.y];
     }
-
     void set_disc(Point p) {
         set_disc(p, this->curPlayer);
     }
     void set_disc(Point p, int disc) {
-        if (board[p.x][p.y] == 0) cntDisks++;
+        discsCnt[get_disc(p)]--;
+        discsCnt[disc]++;
         board[p.x][p.y] = disc;
     }
-
     bool is_disc_at(Point p, int disc) const {
         if (!is_spot_on_board(p))
             return false;
@@ -159,7 +163,6 @@ class Board {
             return false;
         return true;
     }
-
     bool is_spot_valid(Point center) const {
         if (get_disc(center) != EMPTY)
             return false;
@@ -177,7 +180,6 @@ class Board {
         }
         return false;
     }
-
     void flip_discs(Point center) {
         for (Point dir : directions) {
             Point p = center + dir;
@@ -197,7 +199,6 @@ class Board {
             }
         }
     }
-
     std::set<Point> get_valid_spots() const {
         std::set<Point> valid_spots;
         for (int i = 0; i < SIZE; i++) {
@@ -211,35 +212,14 @@ class Board {
         }
         return valid_spots;
     }
-
-    int calc_cnt_disks() {
-        int cnt = 0;
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (board[i][j] != 0)
-                    cnt++;
-            }
-        }
-        return this->cntDisks = cnt;
-    }
-    int get_cnt_disks() const {
-        return this->cntDisks;
-    }
     bool is_terminal() const {
-        return this->cntDisks == 64;
+        int cnt = discsCnt[1] + discsCnt[2];
+        if (cnt == 64) return true;
+        return cnt == 64;
     }
-
     int calc_value() {
-        int val = 0;
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (board[i][j] == curPlayer)
-                    val += 1;
-                else if (board[i][j] == get_next_player())
-                    val -= 1;
-            }
-        }
-        return this->value = val;
+        this->value = discsCnt[curPlayer] - discsCnt[get_next_player()];
+        return this->value;
     }
     int calc_value(const State& weight) {
         int val = 0;
@@ -286,6 +266,10 @@ std::ostream& operator<<(std::ostream& os, const Board& rhs) {
     return os;
 }
 
+/**
+ * @brief Input output dealer
+ * 
+ */
 struct Engine {
     static std::ifstream fin;
     static std::ofstream fout;
@@ -329,37 +313,36 @@ std::set<Point> Engine::nxtSpots;
 class AIMethod {
    protected:
     const State WEIGHT = {{
-        {1000, 5, 80, 60, 60, 80, 5, 1000},
+        {100, 5, 80, 60, 60, 80, 5, 100},
         {5, 0, 10, 10, 10, 10, 0, 5},
         {80, 10, 20, 20, 20, 20, 10, 80},
         {60, 10, 20, 20, 20, 20, 10, 60},
         {60, 10, 20, 20, 20, 20, 10, 60},
         {80, 10, 20, 20, 20, 20, 10, 80},
         {5, 0, 10, 10, 10, 10, 0, 5},
-        {1000, 5, 80, 60, 60, 80, 5, 1000},
+        {100, 5, 80, 60, 60, 80, 5, 100},
     }};
     const State PT_WEIGHT = {{
-        {10000, -1000, 10, 10, 10, 10, -1000, 10000},
-        {-1000, -1000, 0, 0, 0, 0, -1000, -1000},
-        {10, 0, 100, 100, 100, 100, 0, 10},
-        {10, 0, 100, 100, 100, 100, 0, 10},
-        {10, 0, 100, 100, 100, 100, 0, 10},
-        {10, 0, 100, 100, 100, 100, 0, 10},
-        {-1000, -1000, 0, 0, 0, 0, -1000, -1000},
-        {10000, -1000, 10, 10, 10, 10, -1000, 10000},
+        {1100, 0, 750, 750, 750, 750, 0, 1100},
+        {0, 0, 250, 250, 250, 250, 0, 0},
+        {750, 250, 500, 500, 500, 500, 250, 750},
+        {750, 250, 500, 500, 500, 500, 250, 750},
+        {750, 250, 500, 500, 500, 500, 250, 750},
+        {750, 250, 500, 500, 500, 500, 250, 750},
+        {0, 0, 250, 250, 250, 250, 0, 0},
+        {1100, 0, 750, 750, 750, 750, 0, 1100},
     }};
     int curPlayer;
     Board curBoard;
     std::set<Point> nxtSpots;
 
    public:
-    AIMethod() {}
-    virtual ~AIMethod() {}
-    virtual void initialize(int& player, Board& board, std::set<Point>& next_spots) {
-        this->curPlayer = player;
-        this->curBoard = board;
-        this->nxtSpots = next_spots;
+    AIMethod() {
+        this->curPlayer = Engine::curPlayer;
+        this->curBoard = Engine::curBoard;
+        this->nxtSpots = Engine::nxtSpots;
     }
+    virtual ~AIMethod() {}
     virtual void solve() = 0;
 };
 
@@ -378,26 +361,29 @@ class AIRandom : public AIMethod {
         }
     }
 };
-class AIMinimax : public AIMethod {
+class AIMinimaxV0 : public AIMethod {  // determine with naive value + win or lose
    public:
-    AIMinimax() {
-        LOG() << "Method: Minimax v0\n";
+    AIMinimaxV0() {
+        LOG() << "Method: Minimax v01\n";
     }
     void solve() override {
-        this->curBoard.calc_cnt_disks();
         this->getMinimaxVal(this->curBoard, 0);
     }
 
    private:
-    const int MAXDEPTH = 4;
+    const int MAXDEPTH = 5;
     int getMinimaxVal(Board curBoard, int depth) const {
-        if (depth >= MAXDEPTH || curBoard.is_terminal()) {
+        if (depth >= MAXDEPTH) {
             return curBoard.calc_value();
+        } else if (curBoard.is_terminal()) {
+            curBoard.calc_value();
+            if (curBoard.get_value() > 0) return MAX;
+            if (curBoard.get_value() < 0) return MIN;
+            if (curBoard.get_value() == 0) return 0;
         }
 
         std::set<Point> nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots());
-
-        int maxVal = INT_MIN;
+        int maxVal = MIN;
         for (auto spot : nxtSpots) {
             Board nxtBoard = curBoard;
             int nxtVal;
@@ -406,44 +392,126 @@ class AIMinimax : public AIMethod {
             nxtBoard.flip_player();
             nxtVal = -this->getMinimaxVal(nxtBoard, depth + 1);
             if (nxtVal > maxVal) {
-                if (depth == 0) Engine::write_spot(spot);
+                if (depth == 0) {
+                    Engine::write_spot(spot);
+                    LOG() << "Value of: " << spot << ": " << nxtVal << "\n";
+                }
                 maxVal = nxtVal;
             }
         }
         return maxVal;
-        // if (curBoard.get_player() == this->curBoard.get_player()) {
-        //     // maximizing player
-        //     int maxVal = INT_MIN;
-        //     for (auto spot : nxtSpots) {
-        //         Board nxtBoard = curBoard;
-        //         int nxtVal;
-        //         nxtBoard.set_disc(spot);
-        //         nxtBoard.flip_discs(spot);
-        //         nxtBoard.flip_player();
-        //         nxtVal = this->getMinimaxVal(nxtBoard, depth + 1);
-        //         if (nxtVal > maxVal) {
-        //             if (depth == 0) Engine::write_spot(spot);
-        //             maxVal = nxtVal;
-        //         }
-        //     }
-        //     return maxVal;
-        // } else {
-        //     // Minimizing Player
-        //     int minVal = INT_MAX;
-        //     for (auto spot : nxtSpots) {
-        //         Board nxtBoard = curBoard;
-        //         int nxtVal;
-        //         nxtBoard.set_disc(spot);
-        //         nxtBoard.flip_discs(spot);
-        //         nxtBoard.flip_player();
-        //         nxtVal = this->getMinimaxVal(nxtBoard, depth + 1);
-        //         if (nxtVal < minVal) {
-        //             if (depth == 0) Engine::write_spot(spot);
-        //             minVal = nxtVal;
-        //         }
-        //     }
-        //     return minVal;
-        // }
+    }
+};
+class AIMinimaxV1 : public AIMethod {  // determine with target spot + win or lose
+   public:
+    AIMinimaxV1() {
+        LOG() << "Method: Minimax Enhanced v1\n";
+    }
+    void solve() override {
+        this->getMinimaxVal(this->curBoard, 0);
+    }
+
+   private:
+    const int MAXDEPTH = 5;
+    int getMinimaxVal(Board curBoard, int depth) const {
+        if (curBoard.is_terminal()) {
+            curBoard.calc_value();
+            if (curBoard.get_value() > 0) return MAX;
+            if (curBoard.get_value() < 0) return MIN;
+            if (curBoard.get_value() == 0) return 0;
+        } else if (depth >= MAXDEPTH) {
+            return 0;
+        }
+
+        std::set<Point> nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots());
+        int maxVal = MIN;
+        for (auto spot : nxtSpots) {
+            Board nxtBoard = curBoard;
+            int nxtVal;
+            nxtBoard.set_disc(spot);
+            nxtBoard.flip_discs(spot);
+            nxtBoard.flip_player();
+            nxtVal = -this->getMinimaxVal(nxtBoard, depth + 1);
+            nxtVal = std::max(nxtVal, nxtVal + PT_WEIGHT[spot.x][spot.y]);
+            if (nxtVal > maxVal) {
+                if (depth == 0) {
+                    Engine::write_spot(spot);
+                    LOG() << "Value of: " << spot << ": " << nxtVal << "\n";
+                }
+                maxVal = nxtVal;
+            }
+        }
+        return maxVal;
+    }
+};
+class AIMinimaxV2 : public AIMethod {  // determine with target spot + board weight + win or lose
+   public:
+    AIMinimaxV2() {
+        LOG() << "Method: Minimax Enhanced v2\n";
+    }
+    void solve() override {
+        this->getMinimaxVal(this->curBoard, 0);
+    }
+
+   private:
+    // 5 is max
+    const int MAXDEPTH = 5;
+    int getMinimaxVal(Board curBoard, int depth) const {
+        int action;  // 0:normal 1:terminal 2:depthmax
+        std::set<Point> nxtSpots;
+        std::set<Point> nxt2Spots;
+        Board nxtBoard;
+        int maxVal, nxtVal;
+
+        action = 0;
+        if (curBoard.is_terminal()) {
+            action = 1;
+        } else if (depth >= MAXDEPTH) {
+            action = 2;
+        }
+
+        maxVal = MIN;
+        if (action == 0) {
+            nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots());
+            if (nxtSpots.empty()) {
+                nxtBoard = curBoard;
+                nxtBoard.flip_player();
+                nxt2Spots = nxtBoard.get_valid_spots();
+                if (nxt2Spots.empty())
+                    action = 1;
+            }
+        }
+
+        if (action == 0) {
+            for (auto spot : nxtSpots) {
+                nxtBoard = curBoard;
+
+                nxtBoard.set_disc(spot);
+                nxtBoard.flip_discs(spot);
+                nxtBoard.flip_player();
+                nxtVal = -this->getMinimaxVal(nxtBoard, depth + 1);
+                if (nxtVal > maxVal) {
+                    if (depth == 0) {
+                        Engine::write_spot(spot);
+                        LOG() << "Value of " << curBoard.get_player() << "-" << nxtBoard.get_player() << " " << spot << " is " << nxtVal << "\n";
+                    }
+                    maxVal = nxtVal;
+                }
+            }
+        }
+
+        if (action == 0) {
+            if (maxVal < -0x7ffffff) LOG() << "!!! Death End !!!\n";
+            return maxVal;
+        } else if (action == 1) {
+            curBoard.calc_value();
+            if (curBoard.get_value() > 0) return MAX;
+            if (curBoard.get_value() < 0) return MIN;
+            if (curBoard.get_value() == 0) return 0;
+        } else if (action == 2) {
+            return curBoard.calc_value(WEIGHT);
+        }
+        return 0;
     }
 };
 class AIAlphaBetaPruning : public AIMethod {
@@ -452,10 +520,10 @@ class AIAlphaBetaPruning : public AIMethod {
         LOG() << "Method: Alpha-Beta Pruning v0.1\n";
     }
     void solve() override {
-        this->getAlphaBetaVal(this->curBoard, 0, INT_MIN, INT_MAX);
-        // int maxVal = INT_MIN;
-        // int alpha = INT_MIN;
-        // int beta = INT_MAX;
+        this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX);
+        // int maxVal = MIN;
+        // int alpha = MIN;
+        // int beta = MAX;
         // for (auto spot : nxtSpots) {  // Initialize BFS tasks
         //     Board nxtBoard = curBoard;
         //     int nxtVal;
@@ -464,10 +532,10 @@ class AIAlphaBetaPruning : public AIMethod {
         //     nxtBoard.calc_value(WEIGHT);
         //     nxtBoard.flip_player();
         //     nxtVal = this->getAlphaBetaVal(nxtBoard, 1, -beta, -alpha);
-        //     if (nxtVal == INT_MIN)
-        //         nxtVal = INT_MAX;
-        //     else if (nxtVal == INT_MAX)
-        //         nxtVal = INT_MIN;
+        //     if (nxtVal == MIN)
+        //         nxtVal = MAX;
+        //     else if (nxtVal == MAX)
+        //         nxtVal = MIN;
         //     else
         //         nxtVal = nxtBoard.get_value() + PT_WEIGHT[spot.x][spot.y] - nxtVal;
         //     if (nxtVal >= maxVal) {
@@ -487,7 +555,7 @@ class AIAlphaBetaPruning : public AIMethod {
         if (depth > MAXDEPTH) return 0;
 
         std::set<Point> nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots());
-        int maxVal = INT_MIN;
+        int maxVal = MIN;
         for (auto spot : nxtSpots) {
             Board nxtBoard = curBoard;
             int nxtVal;
@@ -496,10 +564,10 @@ class AIAlphaBetaPruning : public AIMethod {
             nxtBoard.calc_value(WEIGHT);
             nxtBoard.flip_player();
             nxtVal = this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha);
-            if (nxtVal == INT_MIN)
-                nxtVal = INT_MAX;
-            else if (nxtVal == INT_MAX)
-                nxtVal = INT_MIN;
+            if (nxtVal == MIN)
+                nxtVal = MAX;
+            else if (nxtVal == MAX)
+                nxtVal = MIN;
             else
                 nxtVal = nxtBoard.get_value() + PT_WEIGHT[spot.x][spot.y] - nxtVal;
 
@@ -527,19 +595,18 @@ int main(int, char** argv) {
         LOG() << "╰(*°▽°*)╯(❁´◡`❁)(●'◡'●)\n";
     }
 
-    AIMethod* aiMethod = new AIMinimax();
     Engine::fin.open(argv[1]);                      // Input file stream
     Engine::fout.open(argv[2]);                     // Output file stream
     Engine::read_board();                           // Read the board from fin
     Engine::read_spots();                           // Read Valid inputs from fin
     Engine::write_spot(*Engine::nxtSpots.begin());  // Output once first to prevent running too long
-    Engine::curBoard.set_player(Engine::curPlayer);
+    Engine::curBoard.initialize(Engine::curPlayer);
 
     if (DEBUG) {
         LOG() << "Current Player: " << (Engine::curPlayer == 1 ? "O" : "X") << "\n";
         LOG() << "Current Board:\n";
         LOG() << Engine::curBoard;
-        LOG() << "Valid moves:\n";
+        LOG() << "Valid moves: ";
         for (auto it = Engine::nxtSpots.begin(); it != Engine::nxtSpots.end(); it++) {
             auto nxtit = it;
             LOG() << (*it) << (++nxtit != Engine::nxtSpots.end() ? ", " : "\n");
@@ -548,7 +615,7 @@ int main(int, char** argv) {
     }
 
     // Start AI;
-    aiMethod->initialize(Engine::curPlayer, Engine::curBoard, Engine::nxtSpots);
+    AIMethod* aiMethod = new AIMinimaxV2();
     aiMethod->solve();
     delete aiMethod;
 
