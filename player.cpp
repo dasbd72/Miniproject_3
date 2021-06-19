@@ -1,35 +1,10 @@
 #include <bits/stdc++.h>
-#define DEBUG 1
+
+#include "LOG.h"
 #define MIN -0x7FFFFFFF
 #define MAX 0x7FFFFFFF
 const int SIZE = 8;
 using State = std::array<std::array<int, SIZE>, SIZE>;
-struct LOCALTIME {
-    static std::chrono::_V2::system_clock::time_point start;
-    static std::chrono::duration<double> get_duration() {
-        return std::chrono::system_clock::now() - start;
-    }
-};
-std::chrono::_V2::system_clock::time_point LOCALTIME::start;
-
-/**
- * @brief Call the class as cout, ex: LOG() << "Hello World";
- */
-class LOG {
-   public:
-    static std::ofstream fout;
-    LOG() {}
-    ~LOG() {}
-    template <class T>
-    LOG& operator<<(const T& msg) {
-        if (DEBUG) {
-            fout << msg;
-            LOG::fout.flush();
-        }
-        return *this;
-    }
-};
-std::ofstream LOG::fout;
 
 /**
  * @brief Stores: x, y.
@@ -278,8 +253,8 @@ struct Engine {
     }
     static void write_spot(Point pt) {
         fout << pt.x << " " << pt.y << std::endl;
-        LOG() << "Moved: " << pt << "\n";
         fout.flush();
+        { LOG() << "Moved: " << pt << "\n"; }
     }
 };
 std::ifstream Engine::fin;
@@ -426,12 +401,6 @@ class AIAlphaBetaPruning : public AIMethod {  // determine with target spot + bo
 };
 
 int main(int, char** argv) {
-    if (DEBUG) {
-        LOCALTIME::start = std::chrono::system_clock::now();
-        LOG::fout.open("debuglog.txt", std::ofstream::ate | std::ofstream::app);
-        LOG() << "╰(*°▽°*)╯(❁´◡`❁)(●'◡'●)\n";
-    }
-
     Engine::fin.open(argv[1]);                      // Input file stream
     Engine::fout.open(argv[2]);                     // Output file stream
     Engine::read_board();                           // Read the board from fin
@@ -439,16 +408,18 @@ int main(int, char** argv) {
     Engine::write_spot(*Engine::nxtSpots.begin());  // Output once first to prevent running too long
     Engine::curBoard.initialize();
 
-    if (DEBUG) {
-        LOG() << "Current Player: " << (Engine::curPlayer == 1 ? "O" : "X") << "\n";
-        LOG() << "Current Board:\n";
-        LOG() << Engine::curBoard;
-        LOG() << "Valid moves: ";
+    {
+        LOCALTIME::initialize();
+        LOG::initialize();
+        LOG() << "╰(*°▽°*)╯(❁´◡`❁)(●'◡'●)\n"
+              << "Current Player: " << (Engine::curPlayer == 1 ? "O" : "X") << "\n"
+              << "Current Board:\n"
+              << Engine::curBoard
+              << "Valid moves: ";
         for (auto it = Engine::nxtSpots.begin(); it != Engine::nxtSpots.end(); it++) {
             auto nxtit = it;
             LOG() << (*it) << (++nxtit != Engine::nxtSpots.end() ? ", " : "\n");
         }
-        LOG() << "Time initializing: " << LOCALTIME::get_duration().count() << "s\n";
     }
 
     // Start AI;
@@ -456,13 +427,13 @@ int main(int, char** argv) {
     aiMethod->solve();
     delete aiMethod;
 
-    if (DEBUG) {
-        LOG() << "Duration: " << LOCALTIME::get_duration().count() << "s\n";
-        LOG() << "=================\n";
-        LOG::fout.close();
-    }
-
     Engine::fin.close();
     Engine::fout.close();
+
+    {
+        LOG() << "Duration: " << LOCALTIME::get_duration() << "s\n";
+        LOG() << "=================\n";
+        LOG::terminate();
+    }
     return 0;
 }
