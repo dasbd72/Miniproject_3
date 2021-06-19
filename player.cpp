@@ -76,22 +76,14 @@ class Board {
     friend class Engine;
     friend std::ostream& operator<<(std::ostream&, const Board&);
     bool operator==(const Board& rhs) const {
-        return this->curPlayer == rhs.curPlayer && this->board == rhs.board;
+        return this->board == rhs.board;
     }
     bool operator!=(const Board& rhs) const {
         return !operator==(rhs);
     }
-    bool operator<(const Board& rhs) const {
-        return this->curPlayer < rhs.curPlayer;
-    }
-    bool operator>(const Board& rhs) const {
-        return operator!=(rhs) && !operator<(rhs);
-    }
     Board& operator=(const Board& rhs) {  // REMEMBER change when add new variables
         this->board = rhs.board;
-        this->curPlayer = rhs.curPlayer;
         this->discsCnt = rhs.discsCnt;
-        this->historySpots = rhs.historySpots;
         return *this;
     }
     const constexpr std::array<int, SIZE> operator[](int idx) const {
@@ -108,14 +100,10 @@ class Board {
 
    private:
     State board;
-    int curPlayer;
-    int value;
     std::array<int, 3> discsCnt;
-    std::vector<Point> historySpots;
 
    public:
     Board() {
-        value = 0;
         discsCnt = {0, 0, 0};
     }
     Board(const Board& other) {
@@ -123,9 +111,7 @@ class Board {
         operator=(other);
     }
     ~Board() = default;
-    void initialize(int player) {
-        this->curPlayer = player;
-
+    void initialize() {
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
                 discsCnt[board[i][j]]++;
@@ -133,14 +119,8 @@ class Board {
         }
     }
 
-    void flip_player() {
-        this->curPlayer = this->get_next_player();
-    }
-    int get_player() const {
-        return this->curPlayer;
-    }
-    int get_next_player() const {
-        return 3 - this->curPlayer;
+    int get_next_player(int player) const {
+        return 3 - player;
     }
     bool is_spot_on_board(Point p) const {
         return 0 <= p.x && p.x < SIZE && 0 <= p.y && p.y < SIZE;
@@ -148,49 +128,23 @@ class Board {
     int get_disc(Point p) const {
         return board[p.x][p.y];
     }
-    void set_disc(Point p) {
-        set_disc(p, this->curPlayer);
-    }
     void set_disc(Point p, int disc) {
         discsCnt[get_disc(p)]--;
         discsCnt[disc]++;
         board[p.x][p.y] = disc;
     }
-    bool is_disc_at(Point p, int disc) const {
-        if (!is_spot_on_board(p))
-            return false;
-        if (get_disc(p) != disc)
-            return false;
-        return true;
-    }
-    bool is_spot_valid(Point center) const {
-        if (get_disc(center) != EMPTY)
-            return false;
-        for (Point dir : directions) {
-            // Move along the direction while testing.
-            Point p = center + dir;
-            if (!is_disc_at(p, get_next_player()))
-                continue;
-            p = p + dir;
-            while (is_spot_on_board(p) && get_disc(p) != EMPTY) {
-                if (is_disc_at(p, curPlayer))
-                    return true;
-                p = p + dir;
-            }
-        }
-        return false;
-    }
     void flip_discs(Point center) {
+        int player = get_disc(center);
         for (Point dir : directions) {
             Point p = center + dir;
-            if (!is_disc_at(p, get_next_player()))
+            if (!is_disc_at(p, get_next_player(player)))
                 continue;
             std::vector<Point> discs({p});
             p = p + dir;
             while (is_spot_on_board(p) && get_disc(p) != EMPTY) {
-                if (is_disc_at(p, curPlayer)) {
+                if (is_disc_at(p, player)) {
                     for (Point s : discs) {
-                        set_disc(s, curPlayer);
+                        set_disc(s, player);
                     }
                     break;
                 }
@@ -199,14 +153,42 @@ class Board {
             }
         }
     }
-    std::set<Point> get_valid_spots() const {
+    void set_move(Point p, int player) {
+        set_disc(p, player);
+        flip_discs(p);
+    }
+    bool is_disc_at(Point p, int disc) const {
+        if (!is_spot_on_board(p))
+            return false;
+        if (get_disc(p) != disc)
+            return false;
+        return true;
+    }
+    bool is_spot_valid(Point center, int player) const {
+        if (get_disc(center) != EMPTY)
+            return false;
+        for (Point dir : directions) {
+            // Move along the direction while testing.
+            Point p = center + dir;
+            if (!is_disc_at(p, get_next_player(player)))
+                continue;
+            p = p + dir;
+            while (is_spot_on_board(p) && get_disc(p) != EMPTY) {
+                if (is_disc_at(p, player))
+                    return true;
+                p = p + dir;
+            }
+        }
+        return false;
+    }
+    std::set<Point> get_valid_spots(int player) const {
         std::set<Point> valid_spots;
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
                 Point p = Point(i, j);
                 if (board[i][j] != EMPTY)
                     continue;
-                if (is_spot_valid(p))
+                if (is_spot_valid(p, player))
                     valid_spots.insert(p);
             }
         }
@@ -312,26 +294,6 @@ std::set<Point> Engine::nxtSpots;
  */
 class AIMethod {
    protected:
-    const State WEIGHT = {{
-        {100, 5, 80, 60, 60, 80, 5, 100},
-        {5, 0, 10, 10, 10, 10, 0, 5},
-        {80, 10, 20, 20, 20, 20, 10, 80},
-        {60, 10, 20, 20, 20, 20, 10, 60},
-        {60, 10, 20, 20, 20, 20, 10, 60},
-        {80, 10, 20, 20, 20, 20, 10, 80},
-        {5, 0, 10, 10, 10, 10, 0, 5},
-        {100, 5, 80, 60, 60, 80, 5, 100},
-    }};
-    const State PT_WEIGHT = {{
-        {1100, 0, 750, 750, 750, 750, 0, 1100},
-        {0, 0, 250, 250, 250, 250, 0, 0},
-        {750, 250, 500, 500, 500, 500, 250, 750},
-        {750, 250, 500, 500, 500, 500, 250, 750},
-        {750, 250, 500, 500, 500, 500, 250, 750},
-        {750, 250, 500, 500, 500, 500, 250, 750},
-        {0, 0, 250, 250, 250, 250, 0, 0},
-        {1100, 0, 750, 750, 750, 750, 0, 1100},
-    }};
     int curPlayer;
     Board curBoard;
     std::set<Point> nxtSpots;
@@ -345,15 +307,72 @@ class AIMethod {
     virtual ~AIMethod() {}
     virtual void solve() = 0;
 
+   private:
+    const State WEIGHT_EARLY = {{
+        {100, -100, 80, 50, 50, 80, -100, 100},
+        {-100, -100, 0, 0, 0, 0, -100, -100},
+        {80, 0, 20, 20, 20, 20, 0, 80},
+        {60, 0, 20, 20, 20, 20, 0, 60},
+        {60, 0, 20, 20, 20, 20, 0, 60},
+        {80, 0, 20, 20, 20, 20, 0, 80},
+        {-100, -100, 0, 0, 0, 0, -100, -100},
+        {100, -100, 80, 50, 50, 80, -100, 100},
+    }};
+    const State WEIGHT_MID = {{
+        {1000, -300, 100, 100, 100, 100, -300, 1000},
+        {-300, -500, 0, 0, 0, 0, -500, -300},
+        {100, 0, 0, 0, 0, 0, 0, 100},
+        {100, 0, 0, 0, 0, 0, 0, 100},
+        {100, 0, 0, 0, 0, 0, 0, 100},
+        {100, 0, 0, 0, 0, 0, 0, 100},
+        {-300, -500, 0, 0, 0, 0, -500, -300},
+        {1000, -300, 100, 100, 100, 100, -300, 1000},
+    }};
+    const State PT_SCORE = {{
+        {110, 00, 75, 75, 75, 75, 00, 110},
+        {00, 00, 25, 25, 25, 25, 00, 00},
+        {75, 25, 50, 50, 50, 50, 25, 75},
+        {75, 25, 50, 50, 50, 50, 25, 75},
+        {75, 25, 50, 50, 50, 50, 25, 75},
+        {75, 25, 50, 50, 50, 50, 25, 75},
+        {00, 00, 25, 25, 25, 25, 00, 00},
+        {110, 00, 75, 75, 75, 75, 00, 110},
+    }};
+
    protected:
-    int evaluate_V0(Board& board, int player) const {
+    int sum(int a, int b) const {
+        if (a < 0 && b < 0 && a + b > 0) return MIN;
+        if (a > 0 && b > 0 && a + b < 0) return MAX;
+        return a + b;
+    }
+    int get_ptval(Point p) const {
+        return PT_SCORE[p.x][p.y];
+    }
+    int get_stage(Board& board, int player) const {
+        std::vector<int> row = {0, 1, 6, 7};
+        int stage = 1;
+        for (auto i : row) {
+            for (int j = 0; j < SIZE && stage == 1; j++) {
+                if (board[i][j] == player && WEIGHT_EARLY[i][j] <= 0) stage = 2;
+            }
+            if (stage != 1) break;
+        }
+        return stage;
+    }
+    int evaluate(Board& board, int player) const {
+        int stage = get_stage(board, player);
         int val = 0;
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (board[i][j] == player)
-                    val += WEIGHT[i][j];
-                else if (board[i][j] == 3 - player)
-                    val -= WEIGHT[i][j];
+
+        if (stage == 1) {
+            val += board.get_valid_spots(player).size() * 100;
+        } else {
+            for (int i = 0; i < SIZE; i++) {
+                for (int j = 0; j < SIZE; j++) {
+                    if (board[i][j] == player)
+                        val += WEIGHT_MID[i][j];
+                    else if (board[i][j] == 3 - player)
+                        val -= WEIGHT_MID[i][j];
+                }
             }
         }
         return val;
@@ -365,21 +384,20 @@ class AIAlphaBetaPruning : public AIMethod {  // determine with target spot + bo
         LOG() << "Method: Alphabeta Pruning v1\n";
     }
     void solve() override {
-        this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX);
+        this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX, this->curPlayer);
     }
 
    private:
     const int MAXDEPTH = 7;
-    int getAlphaBetaVal(Board curBoard, int depth, int alpha, int beta) const {
+    int getAlphaBetaVal(Board curBoard, int depth, int alpha, int beta, int player) const {
         if (curBoard.is_terminal()) {
-            LOG() << "!!Terminal!!\n";
-            int a = curBoard.get_cnt_discs(curBoard.get_player());
-            int b = curBoard.get_cnt_discs(curBoard.get_next_player());
+            int a = curBoard.get_cnt_discs(player);
+            int b = curBoard.get_cnt_discs(3 - player);
             if (a > b) return MAX;
             if (a < b) return MIN;
             if (a == b) return 0;
         } else if (depth >= MAXDEPTH) {
-            return evaluate_V0(curBoard, curBoard.get_player());
+            return evaluate(curBoard, player);
         }
 
         std::set<Point> nxtSpots;
@@ -387,18 +405,16 @@ class AIAlphaBetaPruning : public AIMethod {  // determine with target spot + bo
         int maxVal, nxtVal;
 
         maxVal = MIN;
-        nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots());
+        nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots(player));
 
         for (auto spot : nxtSpots) {
             nxtBoard = curBoard;
-            nxtBoard.set_disc(spot);
-            nxtBoard.flip_discs(spot);
-            nxtBoard.flip_player();
-            nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha);
+            nxtBoard.set_move(spot, player);
+            nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha, 3 - player);
             if (nxtVal > maxVal) {
                 if (depth == 0) {
                     Engine::write_spot(spot);
-                    LOG() << "Value of " << curBoard.get_player() << "-" << nxtBoard.get_player() << " " << spot << " is " << nxtVal << "\n";
+                    LOG() << "Value of " << player << "-" << 3 - player << " " << spot << " is " << nxtVal << "\n";
                 }
                 maxVal = nxtVal;
             }
@@ -421,7 +437,7 @@ int main(int, char** argv) {
     Engine::read_board();                           // Read the board from fin
     Engine::read_spots();                           // Read Valid inputs from fin
     Engine::write_spot(*Engine::nxtSpots.begin());  // Output once first to prevent running too long
-    Engine::curBoard.initialize(Engine::curPlayer);
+    Engine::curBoard.initialize();
 
     if (DEBUG) {
         LOG() << "Current Player: " << (Engine::curPlayer == 1 ? "O" : "X") << "\n";
