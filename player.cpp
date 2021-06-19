@@ -587,6 +587,73 @@ class AIAlphaBetaPruning : public AIMethod {
         return maxVal;
     }
 };
+class AIAlphaBetaPruningV0 : public AIMethod {  // determine with target spot + board weight + win or lose
+   public:
+    AIAlphaBetaPruningV0() {
+        LOG() << "Method: Alphabeta Pruning v0\n";
+    }
+    void solve() override {
+        this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX);
+    }
+
+   private:
+    // 5 is max
+    const int MAXDEPTH = 7;
+    int getAlphaBetaVal(Board curBoard, int depth, int alpha, int beta) const {
+        int action;  // 0:normal 1:terminal 2:depthmax
+        std::set<Point> nxtSpots;
+        std::set<Point> nxtSpots2;
+        Board nxtBoard;
+        int maxVal, nxtVal;
+
+        action = 0;
+        if (curBoard.is_terminal()) {
+            action = 1;
+        } else if (depth >= MAXDEPTH) {
+            action = 2;
+        }
+
+        maxVal = MIN;
+        if (action == 0) {
+            nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots());
+            if (nxtSpots.empty()) {
+                nxtBoard = curBoard;
+                nxtBoard.flip_player();
+                nxtSpots2 = nxtBoard.get_valid_spots();
+                if (nxtSpots2.empty())
+                    action = 1;
+            }
+        }
+
+        if (action == 0) {
+            for (auto spot : nxtSpots) {
+                nxtBoard = curBoard;
+                nxtBoard.set_disc(spot);
+                nxtBoard.flip_discs(spot);
+                nxtBoard.flip_player();
+                nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha);
+                if (nxtVal > maxVal) {
+                    if (depth == 0) {
+                        Engine::write_spot(spot);
+                        LOG() << "Value of " << curBoard.get_player() << "-" << nxtBoard.get_player() << " " << spot << " is " << nxtVal << "\n";
+                    }
+                    maxVal = nxtVal;
+                }
+                alpha = std::max(alpha, maxVal);
+                if (beta <= alpha) break;
+            }
+            return maxVal;
+        } else if (action == 1) {
+            curBoard.calc_value();
+            if (curBoard.get_value() > 0) return MAX;
+            if (curBoard.get_value() < 0) return MIN;
+            if (curBoard.get_value() == 0) return 0;
+        } else if (action == 2) {
+            return curBoard.calc_value(WEIGHT);
+        }
+        return 0;
+    }
+};
 
 int main(int, char** argv) {
     if (DEBUG) {
@@ -615,7 +682,7 @@ int main(int, char** argv) {
     }
 
     // Start AI;
-    AIMethod* aiMethod = new AIMinimaxV2();
+    AIMethod* aiMethod = new AIAlphaBetaPruningV0();
     aiMethod->solve();
     delete aiMethod;
 

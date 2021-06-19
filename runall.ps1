@@ -8,10 +8,10 @@ $baselines = @(
     'baseline\windows\baseline4.exe',
     'baseline\windows\baseline5.exe'
 )
-$baselineidx = 5
+$baselineidx = 1
 $player = @('Player.exe', $baselines[$baselineidx])
 #name of test
-$start_time += "--Pmm2d5vsB" + $baselineidx
+$start_time += "--Pab0d7vsB" + $baselineidx
 
 for ($i = 1; $i -le 6; $i++) {
     $room_base = Join-Path 'room' $start_time
