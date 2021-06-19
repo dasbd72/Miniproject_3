@@ -23,3 +23,5 @@
   - White: 2
 - spot
   - my move
+
+https://en.wikipedia.org/wiki/Computer_Othello#Solving_Othello

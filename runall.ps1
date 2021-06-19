@@ -8,7 +8,7 @@ $baselines = @(
     'baseline\windows\baseline4.exe',
     'baseline\windows\baseline5.exe'
 )
-$baselineidx = 1
+$baselineidx = 5
 $player = @('Player.exe', $baselines[$baselineidx])
 #name of test
 $start_time += "--Pab0d7vsB" + $baselineidx
