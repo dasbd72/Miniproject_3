@@ -34,6 +34,10 @@ struct Point {
         x = rhs.x, y = rhs.y;
         return (*this);
     }
+    int& operator[](const size_t n) {
+        if (n == 0) return x;
+        if (n == 1) return y;
+    }
     friend std::ostream& operator<<(std::ostream&, const Point&);
 
     int x, y;
@@ -254,7 +258,6 @@ struct Engine {
     static void write_spot(Point pt) {
         fout << pt.x << " " << pt.y << std::endl;
         fout.flush();
-        { LOG() << "Moved: " << pt << "\n"; }
     }
 };
 std::ifstream Engine::fin;
@@ -283,15 +286,25 @@ class AIMethod {
     virtual void solve() = 0;
 
    private:
-    const State WEIGHT_EARLY = {{
-        {100, -100, 80, 50, 50, 80, -100, 100},
-        {-100, -100, 0, 0, 0, 0, -100, -100},
-        {80, 0, 20, 20, 20, 20, 0, 80},
-        {60, 0, 20, 20, 20, 20, 0, 60},
-        {60, 0, 20, 20, 20, 20, 0, 60},
-        {80, 0, 20, 20, 20, 20, 0, 80},
-        {-100, -100, 0, 0, 0, 0, -100, -100},
-        {100, -100, 80, 50, 50, 80, -100, 100},
+    enum TYPE_ID {
+        ID_CORNER,
+        ID_CENTER,
+        ID_EDGE_A,
+        ID_EDGE_B,
+        ID_CORN_X,
+        ID_CORN_C,
+        ID_EDGE_0,
+        ID_EDGE_1
+    };
+    const State BOARD_ID = {{
+        {ID_CORNER, ID_CORN_C, ID_EDGE_B, ID_EDGE_A, ID_EDGE_A, ID_EDGE_B, ID_CORN_C, ID_CORNER},
+        {ID_CORN_C, ID_CORN_X, ID_EDGE_1, ID_EDGE_0, ID_EDGE_0, ID_EDGE_1, ID_CORN_X, ID_CORN_C},
+        {ID_EDGE_B, ID_EDGE_1, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_1, ID_EDGE_B},
+        {ID_EDGE_A, ID_EDGE_0, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_0, ID_EDGE_A},
+        {ID_EDGE_A, ID_EDGE_0, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_0, ID_EDGE_A},
+        {ID_EDGE_B, ID_EDGE_1, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_1, ID_EDGE_B},
+        {ID_CORN_C, ID_CORN_X, ID_EDGE_1, ID_EDGE_0, ID_EDGE_0, ID_EDGE_1, ID_CORN_X, ID_CORN_C},
+        {ID_CORNER, ID_CORN_C, ID_EDGE_B, ID_EDGE_A, ID_EDGE_A, ID_EDGE_B, ID_CORN_C, ID_CORNER},
     }};
     const State WEIGHT_MID = {{
         {1000, -300, 100, 100, 100, 100, -300, 1000},
@@ -303,25 +316,15 @@ class AIMethod {
         {-300, -500, 0, 0, 0, 0, -500, -300},
         {1000, -300, 100, 100, 100, 100, -300, 1000},
     }};
-    const State PT_SCORE = {{
-        {110, 00, 75, 75, 75, 75, 00, 110},
-        {00, 00, 25, 25, 25, 25, 00, 00},
-        {75, 25, 50, 50, 50, 50, 25, 75},
-        {75, 25, 50, 50, 50, 50, 25, 75},
-        {75, 25, 50, 50, 50, 50, 25, 75},
-        {75, 25, 50, 50, 50, 50, 25, 75},
-        {00, 00, 25, 25, 25, 25, 00, 00},
-        {110, 00, 75, 75, 75, 75, 00, 110},
-    }};
+    int get_id(Point p) const {
+        return BOARD_ID[p.x][p.y];
+    }
 
    protected:
     int sum(int a, int b) const {
         if (a < 0 && b < 0 && a + b > 0) return MIN;
         if (a > 0 && b > 0 && a + b < 0) return MAX;
         return a + b;
-    }
-    int get_ptval(Point p) const {
-        return PT_SCORE[p.x][p.y];
     }
     int get_stage(Board& board, int player) const {
         std::vector<int> row = {0, 1, 6, 7};
@@ -334,12 +337,11 @@ class AIMethod {
         }
         return stage;
     }
-    int evaluate(Board& board, int player) const {
-        int stage = get_stage(board, player);
+    int evaluate(Board& board, int player) const {  //-1000 ~ 1000
         int val = 0;
-
+        int stage = get_stage(board, player);
         if (stage == 1) {
-            val += board.get_valid_spots(player).size() * 100;
+            val += get_mobility(board, player);
         } else {
             for (int i = 0; i < SIZE; i++) {
                 for (int j = 0; j < SIZE; j++) {
@@ -356,7 +358,6 @@ class AIMethod {
 class AIAlphaBetaPruning : public AIMethod {  // determine with target spot + board weight + win or lose
    public:
     AIAlphaBetaPruning() {
-        LOG() << "Method: Alphabeta Pruning v1\n";
     }
     void solve() override {
         this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX, this->curPlayer);
@@ -435,5 +436,6 @@ int main(int, char** argv) {
         LOG() << "=================\n";
         LOG::terminate();
     }
+
     return 0;
 }
