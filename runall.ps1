@@ -16,7 +16,7 @@ $baselineidx = 5
 
 switch ($case) {
     1 {
-        $start_time += "--PabvsB" + $baselineidx
+        $start_time += "--PabD7+15vsB" + $baselineidx + ""
         $player = @('Player.exe', $baselines[$baselineidx])
         for ($i = 1; $i -le $loop; $i++) {
             $room_base = Join-Path 'room' $start_time
@@ -31,8 +31,8 @@ switch ($case) {
         }
     }
     2 {
-        $player = @('Player.exe', 'Player.exe')
-        $start_time += "--pabVpab"
+        $player = @('PlayerD5.exe', 'PlayerD6.exe')
+        $start_time += "--PabD5vsPabD6"
         for ($i = 1; $i -le $loop; $i++) {
             $room_base = Join-Path 'room' $start_time
             $room_dir = Join-Path $room_base ('room' + $i)

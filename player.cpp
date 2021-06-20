@@ -1,11 +1,21 @@
 #include <bits/stdc++.h>
 
-#include "LOG.h"
+#include "src/LOG.h"
 #define MIN -0x7FFFFFFF
 #define MAX 0x7FFFFFFF
 const int SIZE = 8;
 using State = std::array<std::array<int, SIZE>, SIZE>;
 
+struct LOCALTIME {
+    static std::chrono::_V2::system_clock::time_point start;
+    static double get_duration() {
+        return std::chrono::duration<double>(std::chrono::system_clock::now() - start).count();
+    }
+    static void initialize() {
+        start = std::chrono::system_clock::now();
+    }
+};
+std::chrono::_V2::system_clock::time_point LOCALTIME::start;
 /**
  * @brief Stores: x, y.
  */
@@ -59,6 +69,12 @@ class Board {
     }
     bool operator!=(const Board& rhs) const {
         return !operator==(rhs);
+    }
+    bool operator<(const Board& rhs) const {
+        return 64 - this->get_cnt_discs(0) < 64 - rhs.get_cnt_discs(0);
+    }
+    bool operator>(const Board& rhs) const {
+        return 64 - this->get_cnt_discs(0) > 64 - rhs.get_cnt_discs(0);
     }
     Board& operator=(const Board& rhs) {  // REMEMBER change when add new variables
         this->board = rhs.board;
@@ -307,14 +323,14 @@ class AIMethod {
         {ID_CORNER, ID_CORN_C, ID_EDGE_B, ID_EDGE_A, ID_EDGE_A, ID_EDGE_B, ID_CORN_C, ID_CORNER},
     }};
     const State WEIGHT_MID = {{
-        {1000, -300, 100, 100, 100, 100, -300, 1000},
+        {1000, -300, 500, 100, 100, 500, -300, 1000},
         {-300, -500, 0, 0, 0, 0, -500, -300},
-        {100, 0, 0, 0, 0, 0, 0, 100},
-        {100, 0, 0, 0, 0, 0, 0, 100},
-        {100, 0, 0, 0, 0, 0, 0, 100},
-        {100, 0, 0, 0, 0, 0, 0, 100},
+        {500, 0, 0, 0, 0, 0, 0, 500},
+        {100, 0, 0, 100, 100, 0, 0, 100},
+        {100, 0, 0, 100, 100, 0, 0, 100},
+        {500, 0, 0, 0, 0, 0, 0, 500},
         {-300, -500, 0, 0, 0, 0, -500, -300},
-        {1000, -300, 100, 100, 100, 100, -300, 1000},
+        {1000, -300, 500, 100, 100, 500, -300, 1000},
     }};
     int get_id(Point p) const {
         return BOARD_ID[p.x][p.y];
@@ -331,7 +347,7 @@ class AIMethod {
         int stage = 1;
         for (auto i : row) {
             for (int j = 0; j < SIZE && stage == 1; j++) {
-                if (board[i][j] == player && WEIGHT_EARLY[i][j] <= 0) stage = 2;
+                if (board[i][j] == player && (BOARD_ID[i][j] != ID_CENTER || BOARD_ID[i][j] != ID_EDGE_1)) stage = 2;
             }
             if (stage != 1) break;
         }
@@ -343,61 +359,86 @@ class AIMethod {
         if (stage == 1) {
             val += get_mobility(board, player);
         } else {
-            for (int i = 0; i < SIZE; i++) {
-                for (int j = 0; j < SIZE; j++) {
-                    if (board[i][j] == player)
-                        val += WEIGHT_MID[i][j];
-                    else if (board[i][j] == 3 - player)
-                        val -= WEIGHT_MID[i][j];
-                }
+            val += get_value(board, player);
+        }
+        return val;
+    }
+    int get_mobility(Board& board, int player) const {  // -100 ~ 100
+        int cnt = board.get_valid_spots(player).size() - 3;
+        return cnt < 0 ? cnt * 120 : cnt * 100;
+    }
+    int get_value(Board& board, int player) const {  // -100 ~ 100
+        int val = 0;
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                if (board[i][j] == player)
+                    val += WEIGHT_MID[i][j];
+                else if (board[i][j] == 3 - player)
+                    val -= WEIGHT_MID[i][j];
             }
         }
         return val;
     }
 };
-class AIAlphaBetaPruning : public AIMethod {  // determine with target spot + board weight + win or lose
+class AIAlphaBetaPruning : public AIMethod {
    public:
     AIAlphaBetaPruning() {
     }
     void solve() override {
+        int left = 15;
+        if (this->curBoard.get_cnt_discs(0) <= left)
+            MAXDEPTH = left;
+        else
+            MAXDEPTH = 7;
+        LOG() << "Maxdepth: " << MAXDEPTH << "\n";
         this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX, this->curPlayer);
     }
 
    private:
-    const int MAXDEPTH = 7;
+    int MAXDEPTH;
     int getAlphaBetaVal(Board curBoard, int depth, int alpha, int beta, int player) const {
+        // if (LOCALTIME::get_duration() > 8) {
+        //     LOG() << "!!! TLE !!!\n";
+        //     return 0;
+        // }
+        // if (depth == 1) LOG() << "Time: " << LOCALTIME::get_duration() << "s\n";
+        int retVal = 0;
         if (curBoard.is_terminal()) {
             int a = curBoard.get_cnt_discs(player);
             int b = curBoard.get_cnt_discs(3 - player);
-            if (a > b) return MAX;
-            if (a < b) return MIN;
-            if (a == b) return 0;
+            if (a > b)
+                retVal = MAX;
+            else if (a < b)
+                retVal = MIN;
+            else if (a == b)
+                retVal = 0;
         } else if (depth >= MAXDEPTH) {
-            return evaluate(curBoard, player);
-        }
+            retVal = evaluate(curBoard, player);
+        } else {
+            std::set<Point> nxtSpots;
+            Board nxtBoard;
+            int maxVal, nxtVal;
 
-        std::set<Point> nxtSpots;
-        Board nxtBoard;
-        int maxVal, nxtVal;
+            maxVal = MIN;
+            nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots(player));
 
-        maxVal = MIN;
-        nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots(player));
-
-        for (auto spot : nxtSpots) {
-            nxtBoard = curBoard;
-            nxtBoard.set_move(spot, player);
-            nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha, 3 - player);
-            if (nxtVal > maxVal) {
-                if (depth == 0) {
-                    Engine::write_spot(spot);
-                    LOG() << "Value of " << player << "-" << 3 - player << " " << spot << " is " << nxtVal << "\n";
+            for (auto spot : nxtSpots) {
+                nxtBoard = curBoard;
+                nxtBoard.set_move(spot, player);
+                nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha, 3 - player);
+                if (nxtVal > maxVal) {
+                    if (depth == 0) {
+                        Engine::write_spot(spot);
+                        LOG() << "Value of " << player << "-" << 3 - player << " " << spot << " is " << nxtVal << "\n";
+                    }
+                    maxVal = nxtVal;
                 }
-                maxVal = nxtVal;
+                alpha = std::max(alpha, maxVal);
+                if (beta <= alpha) break;
             }
-            alpha = std::max(alpha, maxVal);
-            if (beta <= alpha) break;
+            retVal = maxVal;
         }
-        return maxVal;
+        return retVal;
     }
 };
 

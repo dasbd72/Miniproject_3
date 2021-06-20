@@ -12,17 +12,6 @@
 #define DEBUGLOG
 #include <bits/stdc++.h>
 
-struct LOCALTIME {
-    static std::chrono::_V2::system_clock::time_point start;
-    static double get_duration() {
-        return std::chrono::duration<double>(std::chrono::system_clock::now() - start).count();
-    }
-    static void initialize() {
-        start = std::chrono::system_clock::now();
-    }
-};
-std::chrono::_V2::system_clock::time_point LOCALTIME::start;
-
 class LOG {
    public:
     enum TYPE {
