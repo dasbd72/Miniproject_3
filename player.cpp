@@ -1,8 +1,8 @@
 #include <bits/stdc++.h>
 
 #include "src/LOG.h"
-#define MIN -0x7FFFFFFF
-#define MAX 0x7FFFFFFF
+#define MIN -0x7EFFFFFF
+#define MAX 0x7EFFFFFF
 const int SIZE = 8;
 using State = std::array<std::array<int, SIZE>, SIZE>;
 
@@ -176,15 +176,15 @@ class Board {
         }
         return false;
     }
-    std::set<Point> get_valid_spots(int player) const {
-        std::set<Point> valid_spots;
+    std::vector<Point> get_valid_spots(int player) const {
+        std::vector<Point> valid_spots;
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
                 Point p = Point(i, j);
                 if (board[i][j] != EMPTY)
                     continue;
                 if (is_spot_valid(p, player))
-                    valid_spots.insert(p);
+                    valid_spots.push_back(p);
             }
         }
         return valid_spots;
@@ -252,7 +252,7 @@ struct Engine {
     static std::ofstream fout;
     static int curPlayer;
     static Board curBoard;
-    static std::set<Point> nxtSpots;
+    static std::vector<Point> nxtSpots;
 
     static void read_board() {
         fin >> curPlayer;
@@ -268,7 +268,7 @@ struct Engine {
         int x, y;
         for (int i = 0; i < n_valid_spots; i++) {
             fin >> x >> y;
-            nxtSpots.insert({x, y});
+            nxtSpots.push_back({x, y});
         }
     }
     static void write_spot(Point pt) {
@@ -280,7 +280,7 @@ std::ifstream Engine::fin;
 std::ofstream Engine::fout;
 int Engine::curPlayer;
 Board Engine::curBoard;
-std::set<Point> Engine::nxtSpots;
+std::vector<Point> Engine::nxtSpots;
 
 /**
  * @brief Virtual Base Class Of the methods, Stores: curPlayer, curBoard, nxtSpots
@@ -290,7 +290,7 @@ class AIMethod {
    protected:
     int curPlayer;
     Board curBoard;
-    std::set<Point> nxtSpots;
+    std::vector<Point> nxtSpots;
 
    public:
     AIMethod() {
@@ -385,10 +385,8 @@ class AIAlphaBetaPruning : public AIMethod {
     AIAlphaBetaPruning() {
     }
     void solve() override {
-        int left = 13;
-        if (this->curBoard.get_cnt_discs(0) <= left)
-            MAXDEPTH = left;
-        else
+        MAXDEPTH = 0;
+        if (this->curBoard.get_cnt_discs(0) > MAXDEPTH)
             MAXDEPTH = 7;
         LOG() << "Maxdepth: " << MAXDEPTH << "\n";
         this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX, this->curPlayer);
@@ -407,10 +405,14 @@ class AIAlphaBetaPruning : public AIMethod {
                 retVal = MIN;
             else if (a == b)
                 retVal = 0;
+            // LOG() << player << "-terminate a:" << a << ", b:" << b << "  " << retVal << "\n"
+            //       << curBoard;
         } else if (depth >= MAXDEPTH) {
             retVal = evaluate(curBoard, player);
+            // LOG() << player << "-eval value: " << retVal << "\n"
+            //       << curBoard;
         } else {
-            std::set<Point> nxtSpots;
+            std::vector<Point> nxtSpots;
             Board nxtBoard;
             int maxVal, nxtVal;
 
@@ -420,6 +422,9 @@ class AIAlphaBetaPruning : public AIMethod {
             for (auto spot : nxtSpots) {
                 nxtBoard = curBoard;
                 nxtBoard.set_move(spot, player);
+                // if (depth == 0) LOG() << "\ncurr:\n"
+                //                       << curBoard << "next:\n"
+                //                       << nxtBoard;
                 nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha, 3 - player);
                 if (nxtVal > maxVal) {
                     if (depth == 0) {

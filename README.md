@@ -1,5 +1,12 @@
 # Miniproject_3 Othello Game AI
 
+## Depth
+
+- 11 no
+- 10 no
+- 9 no
+- 8
+
 ## Naming
 
 ### Prefix
