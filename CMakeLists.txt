@@ -8,4 +8,4 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra")
 
 add_executable(Player player.cpp)
-add_executable(Main main_adjusted.cpp)
+add_executable(Main main.cpp)

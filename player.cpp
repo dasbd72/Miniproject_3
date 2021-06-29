@@ -385,7 +385,7 @@ class AIAlphaBetaPruning : public AIMethod {
     AIAlphaBetaPruning() {
     }
     void solve() override {
-        int left = 15;
+        int left = 13;
         if (this->curBoard.get_cnt_discs(0) <= left)
             MAXDEPTH = left;
         else
@@ -397,11 +397,6 @@ class AIAlphaBetaPruning : public AIMethod {
    private:
     int MAXDEPTH;
     int getAlphaBetaVal(Board curBoard, int depth, int alpha, int beta, int player) const {
-        // if (LOCALTIME::get_duration() > 8) {
-        //     LOG() << "!!! TLE !!!\n";
-        //     return 0;
-        // }
-        // if (depth == 1) LOG() << "Time: " << LOCALTIME::get_duration() << "s\n";
         int retVal = 0;
         if (curBoard.is_terminal()) {
             int a = curBoard.get_cnt_discs(player);
