@@ -1,5 +1,5 @@
 [System.Threading.Thread]::CurrentThread.CurrentUICulture = "en-US" ; [System.Threading.Thread]::CurrentThread.CurrentCulture = "en-US"; $start_time = Get-Date -UFormat "%Y-%m-%d--%H-%M"
-$main = 'Main.exe'
+$main = 'main.exe'
 $baselines = @(
     '',
     'baseline\windows\baseline1.exe',
@@ -17,7 +17,7 @@ $baselineidx = 5
 switch ($case) {
     1 {
         $start_time += "--PabD7+13vsB" + $baselineidx + ""
-        $player = @('Player.exe', $baselines[$baselineidx])
+        $player = @('player.exe', $baselines[$baselineidx])
         for ($i = 1; $i -le $loop; $i++) {
             $room_base = Join-Path 'room' $start_time
             $room_dir = Join-Path $room_base ('room' + $i)
@@ -48,7 +48,7 @@ switch ($case) {
     3 {
         for ($i = 1; $i -le 5; $i++) {
             $start_time += "--PabD7+13vsB" + $i + ""
-            $player = @('Player.exe', $baselines[$i])
+            $player = @('player.exe', $baselines[$i])
             for ($i = 1; $i -le 4; $i++) {
                 $room_base = Join-Path 'room' $start_time
                 $room_dir = Join-Path $room_base ('room' + $i)
