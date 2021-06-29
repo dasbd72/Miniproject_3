@@ -304,7 +304,8 @@ class AIMethod {
    private:
     enum TYPE_ID {
         ID_CORNER,
-        ID_CENTER,
+        ID_CENT_A,
+        ID_CENT_B,
         ID_EDGE_A,
         ID_EDGE_B,
         ID_CORN_X,
@@ -315,22 +316,18 @@ class AIMethod {
     const State BOARD_ID = {{
         {ID_CORNER, ID_CORN_C, ID_EDGE_B, ID_EDGE_A, ID_EDGE_A, ID_EDGE_B, ID_CORN_C, ID_CORNER},
         {ID_CORN_C, ID_CORN_X, ID_EDGE_1, ID_EDGE_0, ID_EDGE_0, ID_EDGE_1, ID_CORN_X, ID_CORN_C},
-        {ID_EDGE_B, ID_EDGE_1, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_1, ID_EDGE_B},
-        {ID_EDGE_A, ID_EDGE_0, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_0, ID_EDGE_A},
-        {ID_EDGE_A, ID_EDGE_0, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_0, ID_EDGE_A},
-        {ID_EDGE_B, ID_EDGE_1, ID_CENTER, ID_CENTER, ID_CENTER, ID_CENTER, ID_EDGE_1, ID_EDGE_B},
+        {ID_EDGE_B, ID_EDGE_1, ID_CENT_B, ID_CENT_A, ID_CENT_A, ID_CENT_B, ID_EDGE_1, ID_EDGE_B},
+        {ID_EDGE_A, ID_EDGE_0, ID_CENT_A, ID_CENT_A, ID_CENT_A, ID_CENT_A, ID_EDGE_0, ID_EDGE_A},
+        {ID_EDGE_A, ID_EDGE_0, ID_CENT_A, ID_CENT_A, ID_CENT_A, ID_CENT_A, ID_EDGE_0, ID_EDGE_A},
+        {ID_EDGE_B, ID_EDGE_1, ID_CENT_B, ID_CENT_A, ID_CENT_A, ID_CENT_B, ID_EDGE_1, ID_EDGE_B},
         {ID_CORN_C, ID_CORN_X, ID_EDGE_1, ID_EDGE_0, ID_EDGE_0, ID_EDGE_1, ID_CORN_X, ID_CORN_C},
         {ID_CORNER, ID_CORN_C, ID_EDGE_B, ID_EDGE_A, ID_EDGE_A, ID_EDGE_B, ID_CORN_C, ID_CORNER},
     }};
-    const State WEIGHT_MID = {{
-        {1000, -300, 500, 100, 100, 500, -300, 1000},
-        {-300, -500, 0, 0, 0, 0, -500, -300},
-        {500, 0, 0, 0, 0, 0, 0, 500},
-        {100, 0, 0, 100, 100, 0, 0, 100},
-        {100, 0, 0, 100, 100, 0, 0, 100},
-        {500, 0, 0, 0, 0, 0, 0, 500},
-        {-300, -500, 0, 0, 0, 0, -500, -300},
-        {1000, -300, 500, 100, 100, 500, -300, 1000},
+    const std::array<std::array<Point, 4>, 4> CORNERS = {{
+        {{{0, 0}, {0, 1}, {1, 0}, {1, 1}}},
+        {{{7, 0}, {7, 1}, {6, 0}, {6, 1}}},
+        {{{7, 7}, {7, 6}, {6, 7}, {6, 6}}},
+        {{{0, 7}, {0, 6}, {1, 7}, {1, 6}}},
     }};
     int get_id(Point p) const {
         return BOARD_ID[p.x][p.y];
@@ -347,13 +344,13 @@ class AIMethod {
         int stage = 1;
         for (auto i : row) {
             for (int j = 0; j < SIZE && stage == 1; j++) {
-                if (board[i][j] == player && (BOARD_ID[i][j] != ID_CENTER || BOARD_ID[i][j] != ID_EDGE_1)) stage = 2;
+                if (board[i][j] == player && (BOARD_ID[i][j] != ID_CENT_A || BOARD_ID[i][j] != ID_CENT_B || BOARD_ID[i][j] != ID_EDGE_1)) stage = 2;
             }
             if (stage != 1) break;
         }
         return stage;
     }
-    int evaluate(Board& board, int player) const {  //-1000 ~ 1000
+    int evaluate(Board& board, int player) const {
         int val = 0;
         int stage = get_stage(board, player);
         if (stage == 1) {
@@ -363,18 +360,56 @@ class AIMethod {
         }
         return val;
     }
-    int get_mobility(Board& board, int player) const {  // -100 ~ 100
+    int get_mobility(Board& board, int player) const {
         int cnt = board.get_valid_spots(player).size() - 3;
         return cnt < 0 ? cnt * 120 : cnt * 100;
     }
-    int get_value(Board& board, int player) const {  // -100 ~ 100
+    int get_value(Board& board, int player) const {
         int val = 0;
+        for (auto& CORNERARR : CORNERS) {
+            int corn[4];
+            for (int i = 0; i < 4; i++) corn[i] = board.get_disc(CORNERARR[i]);
+            if (corn[0] == 0) {
+                if (corn[1]) val += (corn[1] == player ? -1 : 1) * 700;
+                if (corn[2]) val += (corn[2] == player ? -1 : 1) * 700;
+                if (corn[3]) val += (corn[3] == player ? -1 : 1) * 1000;
+            } else {
+                val += (corn[0] == player ? 1 : -1) * 4000;
+                if (corn[1]) val += (corn[1] == player ? 1 : -1) * 200;
+                if (corn[2]) val += (corn[2] == player ? 1 : -1) * 200;
+                // if (corn[3]) val += (corn[3] == player ? 1 : -1) * 100;
+            }
+        }
         for (int i = 0; i < SIZE; i++) {
             for (int j = 0; j < SIZE; j++) {
-                if (board[i][j] == player)
-                    val += WEIGHT_MID[i][j];
-                else if (board[i][j] == 3 - player)
-                    val -= WEIGHT_MID[i][j];
+                switch (BOARD_ID[i][j]) {
+                    case ID_CORNER:
+                        break;
+                    case ID_CORN_X:
+                        break;
+                    case ID_CORN_C:
+                        break;
+                    case ID_CENT_A:
+                        val += (board[i][j] == player ? 1 : -1) * 100;
+                        break;
+                    case ID_CENT_B:
+                        val += (board[i][j] == player ? 1 : -1) * -100;
+                        break;
+                    case ID_EDGE_A:
+                        val += (board[i][j] == player ? 1 : -1) * 100;
+                        break;
+                    case ID_EDGE_B:
+                        val += (board[i][j] == player ? 1 : -1) * 500;
+                        break;
+                    case ID_EDGE_0:
+                        val += (board[i][j] == player ? 1 : -1) * -100;
+                        break;
+                    case ID_EDGE_1:
+                        val += (board[i][j] == player ? 1 : -1) * -200;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         return val;
@@ -385,9 +420,9 @@ class AIAlphaBetaPruning : public AIMethod {
     AIAlphaBetaPruning() {
     }
     void solve() override {
-        MAXDEPTH = 0;
+        MAXDEPTH = 19;
         if (this->curBoard.get_cnt_discs(0) > MAXDEPTH)
-            MAXDEPTH = 7;
+            MAXDEPTH = 8;
         LOG() << "Maxdepth: " << MAXDEPTH << "\n";
         this->getAlphaBetaVal(this->curBoard, 0, MIN, MAX, this->curPlayer);
     }
@@ -405,12 +440,8 @@ class AIAlphaBetaPruning : public AIMethod {
                 retVal = MIN;
             else if (a == b)
                 retVal = 0;
-            // LOG() << player << "-terminate a:" << a << ", b:" << b << "  " << retVal << "\n"
-            //       << curBoard;
         } else if (depth >= MAXDEPTH) {
             retVal = evaluate(curBoard, player);
-            // LOG() << player << "-eval value: " << retVal << "\n"
-            //       << curBoard;
         } else {
             std::vector<Point> nxtSpots;
             Board nxtBoard;
@@ -419,23 +450,25 @@ class AIAlphaBetaPruning : public AIMethod {
             maxVal = MIN;
             nxtSpots = (depth == 0 ? this->nxtSpots : curBoard.get_valid_spots(player));
 
-            for (auto spot : nxtSpots) {
-                nxtBoard = curBoard;
-                nxtBoard.set_move(spot, player);
-                // if (depth == 0) LOG() << "\ncurr:\n"
-                //                       << curBoard << "next:\n"
-                //                       << nxtBoard;
-                nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha, 3 - player);
-                if (nxtVal > maxVal) {
-                    if (depth == 0) {
-                        Engine::write_spot(spot);
-                        LOG() << "Value of " << player << "-" << 3 - player << " " << spot << " is " << nxtVal << "\n";
+            if (nxtSpots.size() == 0) {
+                maxVal = -this->getAlphaBetaVal(curBoard, depth, -beta, -alpha, 3 - player);
+            } else {
+                for (auto spot : nxtSpots) {
+                    nxtBoard = curBoard;
+                    nxtBoard.set_move(spot, player);
+                    nxtVal = -this->getAlphaBetaVal(nxtBoard, depth + 1, -beta, -alpha, 3 - player);
+                    if (nxtVal > maxVal) {
+                        if (depth == 0) {
+                            Engine::write_spot(spot);
+                            LOG() << "Value of " << player << "-" << 3 - player << " " << spot << " is " << nxtVal << "\n";
+                        }
+                        maxVal = nxtVal;
                     }
-                    maxVal = nxtVal;
+                    alpha = std::max(alpha, maxVal);
+                    if (beta <= alpha) break;
                 }
-                alpha = std::max(alpha, maxVal);
-                if (beta <= alpha) break;
             }
+
             retVal = maxVal;
         }
         return retVal;
